@@ -147,11 +147,11 @@ contract PredictionMarket {
         uint256 amountToTransfer;
         if (bet.bet == true) {
           amountToTransfer = (
-            question.negativeBetAmount / numNegativeBets
+            question.negativeBetAmount / numPositiveBets
           ) + bet.amount;
         } else {
           amountToTransfer = (
-            question.positiveBetAmount/ numPositiveBets
+            question.positiveBetAmount/ numNegativeBets
           ) + bet.amount;
         }
 
