@@ -1,5 +1,4 @@
-# decentralized-prediction-market
-A decentralized predicion market
+# A decentralized prediction market
 
 ## The project will start as a database whereby:
 
@@ -10,7 +9,9 @@ A decentralized predicion market
 
 ## Eventually, will refactor it to include:
 
+- a front end
 - access to oracles.
 - market-making.
 
-
+## Currently passes the following tests
+![Screenshot](passing-tests.png)
