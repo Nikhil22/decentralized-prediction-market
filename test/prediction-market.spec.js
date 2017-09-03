@@ -5,7 +5,6 @@ const expectedExceptionPromise = util.expectedExceptionPromise;
 const promisify = util.promisify;
 
 contract('PredictionMarket', accounts => {
-  const duration = 5;
   const admin = accounts[0];
   const playerOne = accounts[1];
   const playerTwo = accounts[2];
@@ -14,7 +13,6 @@ contract('PredictionMarket', accounts => {
 
   beforeEach(() => {
     return PredictionMarket.new(
-      duration,
       { from: admin }
     )
     .then(thisInstance => {
@@ -85,7 +83,6 @@ contract('PredictionMarket', accounts => {
     it("admin should be able to add a question", done => {
       const questionOne = {
         question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
-        id: 1,
         outcome: false,
         numPositiveBets: 0,
         numNegativeBets: 0,
@@ -99,7 +96,7 @@ contract('PredictionMarket', accounts => {
           { from: admin }
         )
         .then(tx => {
-          return instance.getQuestion(questionOne.id);
+          return instance.getQuestion(1);
         })
         .then(_question => {
           assert.equal(_question[0], questionOne.question, 'question text should be same');
@@ -109,9 +106,8 @@ contract('PredictionMarket', accounts => {
           assert.equal(_question[4], questionOne.numNegativeBets, 'question numNegativeBets should be same');
           assert.equal(_question[5], questionOne.positiveBetAmount, 'question positiveBetAmount should be same');
           assert.equal(_question[6], questionOne.negativeBetAmount, 'question negativeBetAmount should be same');
-          assert.equal(_question[7], questionOne.id, 'question id should be same');
           return getEventsPromise(instance.QuestionAdded(
-              _question[7]
+              1
           ));
         })
         .then((event) => {
@@ -141,18 +137,17 @@ contract('PredictionMarket', accounts => {
           { from: playerOne, value: playerOneBet.amount }
         )
         .then(tx => {
-          return instance.getBet(playerOneBet.bettingAddress);
+          return instance.getBet(playerOneBet.bettingAddress, playerOneBet.questionId);
         })
         .then(_playerOneBet => {
-          assert.equal(_playerOneBet[0], playerOneBet.questionId);
-          assert.equal(_playerOneBet[1], playerOneBet.bettingAddress);
-          assert.equal(_playerOneBet[2], playerOneBet.bet);
-          assert.equal(_playerOneBet[3], playerOneBet.amount);
+          assert.equal(_playerOneBet[0], playerOneBet.bettingAddress);
+          assert.equal(_playerOneBet[1], playerOneBet.bet);
+          assert.equal(_playerOneBet[2], playerOneBet.amount);
           return getEventsPromise(instance.NewBet(
-            _playerOneBet[1],
             _playerOneBet[0],
+            _playerOneBet[1],
             _playerOneBet[2],
-            _playerOneBet[3]
+            playerOneBet.questionId
           ));
         })
         .then((event) => {
@@ -171,7 +166,7 @@ contract('PredictionMarket', accounts => {
           assert.equal(_question[5], updatedQuestionSubObject.positiveBetAmount, 'question positiveBetAmount should be updated');
           return getEventsPromise(instance.UpdatedQuestionData(
               _question.question,
-              _question.id,
+              playerOneBet.questionId,
               _question.numPositiveBets,
               _question.numNegativeBets
           ));
@@ -204,18 +199,17 @@ contract('PredictionMarket', accounts => {
           { from: playerTwo, value: playerTwoBet.amount }
         )
         .then(tx => {
-          return instance.getBet(playerTwoBet.bettingAddress);
+          return instance.getBet(playerTwoBet.bettingAddress, playerTwoBet.questionId);
         })
         .then(_playerTwoBet => {
-          assert.equal(_playerTwoBet[0], playerTwoBet.questionId);
-          assert.equal(_playerTwoBet[1], playerTwoBet.bettingAddress);
-          assert.equal(_playerTwoBet[2], playerTwoBet.bet);
-          assert.equal(_playerTwoBet[3], playerTwoBet.amount);
+          assert.equal(_playerTwoBet[0], playerTwoBet.bettingAddress);
+          assert.equal(_playerTwoBet[1], playerTwoBet.bet);
+          assert.equal(_playerTwoBet[2], playerTwoBet.amount);
           return getEventsPromise(instance.NewBet(
-              _playerTwoBet[1],
               _playerTwoBet[0],
+              _playerTwoBet[1],
               _playerTwoBet[2],
-              _playerTwoBet[3]
+              playerTwoBet.questionId
           ));
         })
         .then((event) => {
@@ -234,7 +228,7 @@ contract('PredictionMarket', accounts => {
           assert.equal(_question[6], updatedQuestionSubObject.negativeBetAmount, 'question negativeBetAmount should be updated');
           return getEventsPromise(instance.UpdatedQuestionData(
               _question.question,
-              _question.id,
+              playerTwoBet.questionId,
               _question.numPositiveBets,
               _question.numNegativeBets
           ));
@@ -284,7 +278,6 @@ contract('PredictionMarket', accounts => {
       };
 
       PredictionMarket.new(
-        duration,
         { from: admin }
       )
       .then(thisInstance => {
@@ -346,7 +339,6 @@ contract('PredictionMarket', accounts => {
       };
 
       PredictionMarket.new(
-        duration,
         { from: admin }
       )
       .then(thisInstance => {
@@ -383,7 +375,7 @@ contract('PredictionMarket', accounts => {
         return instance.getQuestion(questionOne.id);
       })
       .then(_question => {
-        assert.equal(_question[7], true, 'should be resolved');
+        assert.equal(_question[1], true, 'should be resolved');
         done();
       })
       .catch(done);
@@ -404,7 +396,6 @@ contract('PredictionMarket', accounts => {
       };
 
       PredictionMarket.new(
-        duration,
         { from: admin }
       )
       .then(thisInstance => {
@@ -466,7 +457,6 @@ contract('PredictionMarket', accounts => {
       };
 
       PredictionMarket.new(
-        duration,
         { from: admin }
       )
       .then(thisInstance => {
@@ -533,7 +523,6 @@ contract('PredictionMarket', accounts => {
       let initialPlayerTwoBalance;
 
       PredictionMarket.new(
-        duration,
         { from: admin }
       )
       .then(thisInstance => {

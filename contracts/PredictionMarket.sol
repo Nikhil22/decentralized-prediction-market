@@ -2,12 +2,10 @@ pragma solidity ^0.4.10;
 
 contract PredictionMarket {
 
-    address public admin; // okay being public?
+    address public admin;
     mapping (address => bool) public trustedSources;
-    mapping (address => Bet) public bets;
     mapping (uint64 => Question) public questions;
-    uint public deadline;
-    uint32 public numQuestions;
+    uint64 public numQuestions;
 
     struct Question {
         string question;
@@ -17,18 +15,17 @@ contract PredictionMarket {
         uint256 numNegativeBets;
         uint256 positiveBetAmount;
         uint256 negativeBetAmount;
-        uint64 id;
+        mapping(address => Bet) bets;
     }
 
     struct Bet {
-        uint64 questionId;
         address bettingAddress;
         bool bet;
         uint256 amount;
     }
 
     event AddedTrustedSource(address source);
-    event NewBet(address _better, uint64 _questionId, bool _bet, uint _amount);
+    event NewBet(address _better, bool _bet, uint _amount, uint64 _questionId);
     event QuestionResolved(address source, uint64 _questionId, bool _outcome);
     event QuestionAdded(string _question);
     event UpdatedQuestionData(
@@ -41,11 +38,10 @@ contract PredictionMarket {
     );
     event Claimed(address claimant, uint256 amount);
 
-    function PredictionMarket(uint duration)
+    function PredictionMarket()
         public
     {
         admin = msg.sender;
-        deadline = block.number + duration;
     }
 
     function addTrustedSource(address source)
@@ -62,27 +58,32 @@ contract PredictionMarket {
         payable
         public
         positiveBet
+        isUnresolvedQuestion(_questionId)
         returns (bool success)
     {
-        bets[msg.sender] = Bet(_questionId, msg.sender, _bet, msg.value);
-        NewBet(msg.sender, _questionId, _bet, msg.value);
-        updateQuestion(_questionId, _bet);
+        NewBet(msg.sender, _bet, msg.value, _questionId);
+        updateQuestion(_bet, _questionId);
         return true;
     }
 
-    function updateQuestion(uint64 _questionId, bool _bet)
+    function updateQuestion(bool _bet, uint64 _questionId)
       private
       returns (bool success)
     {
+      Bet memory bet = Bet(msg.sender, _bet, msg.value);
       Question storage question = questions[_questionId];
-      if (_bet == true) {
+
+      if (bet.bet == true) {
         question.numPositiveBets++;
         question.positiveBetAmount += msg.value;
-      } else {
+      } else if (bet.bet == false) {
         question.numNegativeBets++;
         question.negativeBetAmount += msg.value;
       }
+
+      question.bets[msg.sender] = bet;
       questions[_questionId] = question;
+
       UpdatedQuestionData(
         question.question,
         _questionId,
@@ -121,38 +122,46 @@ contract PredictionMarket {
           0,
           0,
           0,
-          0,
-          numQuestions
+          0
         );
-        questions[question.id] = question;
+        questions[numQuestions] = question;
         QuestionAdded(_question);
         return true;
     }
 
-    function claimFunds(uint8 _questionId)
+    function claimFunds(uint64 _questionId)
         public
-        isDeadlinePassed
         isQuestionResolved(_questionId)
         returns (bool success)
     {
-        /* get bet from sender address */
-        Bet storage bet = bets[msg.sender];
+        /* get question */
+        Question storage question = questions[_questionId];
 
-        /* get question from questionId */
-        Question storage question = questions[bet.questionId];
+        /* get bet from sender address */
+        Bet memory bet = question.bets[msg.sender];
+
         require(question.outcome == bet.bet);
         uint256 numPositiveBets = question.numPositiveBets;
         uint256 numNegativeBets = question.numNegativeBets;
+        uint256 proportion;
 
         uint256 amountToTransfer;
         if (bet.bet == true) {
+          proportion = bet.amount / question.positiveBetAmount;
+
           amountToTransfer = (
             question.negativeBetAmount / numPositiveBets
           ) + bet.amount;
+
+          amountToTransfer *= proportion;
         } else {
+          proportion = bet.amount / question.negativeBetAmount;
+
           amountToTransfer = (
             question.positiveBetAmount/ numNegativeBets
           ) + bet.amount;
+
+          amountToTransfer *= proportion;
         }
 
         require(amountToTransfer > 0);
@@ -176,11 +185,6 @@ contract PredictionMarket {
         _;
     }
 
-    modifier isDeadlinePassed() {
-        require(block.number >= deadline);
-        _;
-    }
-
     modifier isUnresolvedQuestion(uint64 _questionId) {
         require(!questions[_questionId].resolved);
         _;
@@ -191,19 +195,17 @@ contract PredictionMarket {
         _;
     }
 
-    function getBet(address bettingAddress)
+    function getBet(address bettingAddress, uint64 _questionId)
       constant
       public
       returns (
-        uint64 _questionId,
         address _bettingAddress,
         bool _bet,
         uint256 _amount
       )
     {
-      Bet storage bet = bets[bettingAddress];
+      Bet memory bet = questions[_questionId].bets[bettingAddress];
       return (
-        bet.questionId,
         bet.bettingAddress,
         bet.bet,
         bet.amount
@@ -220,8 +222,7 @@ contract PredictionMarket {
         uint256 _numPositiveBets,
         uint256 _numNegativeBets,
         uint256 _positiveBetAmount,
-        uint256 _negativeBetAmount,
-        uint64 _id
+        uint256 _negativeBetAmount
       )
     {
       Question storage question = questions[questionId];
@@ -232,8 +233,7 @@ contract PredictionMarket {
         question.numPositiveBets,
         question.numNegativeBets,
         question.positiveBetAmount,
-        question.negativeBetAmount,
-        question.id
+        question.negativeBetAmount
       );
     }
 }
