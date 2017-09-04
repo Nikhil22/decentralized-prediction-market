@@ -3,6 +3,9 @@ const util = require('./util');
 const getEventsPromise = util.getEventsPromise;
 const expectedExceptionPromise = util.expectedExceptionPromise;
 const promisify = util.promisify;
+const expectThrow = util.expectThrow;
+const async = require('asyncawait/async');
+const await = require('asyncawait/await');
 
 contract('PredictionMarket', accounts => {
   const admin = accounts[0];
@@ -11,598 +14,431 @@ contract('PredictionMarket', accounts => {
   const trustedSource = accounts[3];
   let instance;
 
-  beforeEach(() => {
-    return PredictionMarket.new(
+  beforeEach(async (() => {
+    instance = await (PredictionMarket.new(
       { from: admin }
-    )
-    .then(thisInstance => {
-      instance = thisInstance;
-    });
-  });
+    ));
+  }));
 
-  it("admin should be set", () => {
-    instance.admin()
-      .then(_admin => {
-        assert.equal(admin, _admin, 'admin is not set');
-      })
-  });
+  it("admin should be set", async(() => {
+    const _admin = await (instance.admin());
+    assert.equal(admin, _admin, 'admin is not set');
+  }));
 
-  it('should revert if a non admin tries to add a trusted source', () => {
-    return expectedExceptionPromise(() => {
-      return instance.addTrustedSource(
-        trustedSource,
-        { from: playerOne, gas: 1000000 }
-      )
-      .then(txObj => txObj.tx);
-    }, 1000000);
-  });
+  it('should revert if a non admin tries to add a trusted source', async (() => {
+    await (expectThrow(instance.addTrustedSource(
+      trustedSource,
+      { from: playerOne, gas: 1000000 }
+    )));
+  }));
 
-  it('should revert if a non admin tries to add a question', () => {
-    return expectedExceptionPromise(() => {
-      return instance.addQuestion(
-        'blah',
-        { from: playerOne, gas: 1000000 }
-      )
-      .then(txObj => txObj.tx);
-    }, 1000000);
-  });
+  it('should revert if a non admin tries to add a question', async(() => {
+    await (expectThrow(instance.addQuestion(
+      'blah',
+      { from: playerOne, gas: 1000000 }
+    )));
+  }));
 
-  it('should revert if a player bets a 0 amount on a question', () => {
-    return expectedExceptionPromise(() => {
-      return instance.bet(
-        1,
-        1,
-        { from: playerOne, value: 0, gas: 1000000 }
-      )
-      .then(txObj => txObj.tx);
-    }, 1000000);
-  });
+  it('should revert if a player bets a 0 amount on a question', async (() => {
+    await (expectThrow(instance.bet(
+      1,
+      1,
+      { from: playerOne, value: 0, gas: 1000000 }
+    )));
+  }));
 
-  it("admin should be able to add a trusted source", done => {
-    instance.addTrustedSource(
-        trustedSource,
+  it("admin should be able to add a trusted source", async (() => {
+    await (instance.addTrustedSource(trustedSource,{ from: admin }));
+    const _didAddSource = await (instance.trustedSources(trustedSource));
+    assert.equal(_didAddSource, true, 'should have added a trusted source');
+    const event = await (getEventsPromise(instance.AddedTrustedSource(
+        trustedSource
+    )));
+    const eventArgs = event[0].args;
+    assert.equal(eventArgs.source.valueOf(), trustedSource, "should be the newly added trusted source");
+  }));
+
+  it("admin should be able to add a question", async (() => {
+    const questionOne = {
+      question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
+      outcome: false,
+      numPositiveBets: 0,
+      numNegativeBets: 0,
+      positiveBetAmount: 0,
+      negativeBetAmount: 0,
+      resolved: false,
+    };
+
+    await (instance.addQuestion(
+        questionOne.question,
         { from: admin }
-      )
-      .then(tx => {
-        return instance.trustedSources(trustedSource);
-      })
-      .then(_didAddSource => {
-        assert.equal(_didAddSource, true, 'should have added a trusted source');
-        return getEventsPromise(instance.AddedTrustedSource(
-            trustedSource
-        ));
-      })
-      .then((event) => {
-        const eventArgs = event[0].args;
-        assert.equal(eventArgs.source.valueOf(), trustedSource, "should be the newly added trusted source");
-        done();
-      })
-      .catch(done);
-    });
+      ));
+    const _question = await (instance.getQuestion(1));
+    assert.equal(_question[0], questionOne.question, 'question text should be same');
+    assert.equal(_question[1], questionOne.resolved, 'question resolution status should be same');
+    assert.equal(_question[2], questionOne.outcome, 'question outcome should be same');
+    assert.equal(_question[3], questionOne.numPositiveBets, 'question numPositiveBets should be same');
+    assert.equal(_question[4], questionOne.numNegativeBets, 'question numNegativeBets should be same');
+    assert.equal(_question[5], questionOne.positiveBetAmount, 'question positiveBetAmount should be same');
+    assert.equal(_question[6], questionOne.negativeBetAmount, 'question negativeBetAmount should be same');
+    const event = await (getEventsPromise(
+      instance.QuestionAdded(1)
+    ));
+    const eventArgs = event[0].args;
+    assert.equal(eventArgs._question.valueOf(), questionOne.question, "should be the newly added question");
+  }));
 
-    it("admin should be able to add a question", done => {
-      const questionOne = {
-        question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
-        outcome: false,
-        numPositiveBets: 0,
-        numNegativeBets: 0,
-        positiveBetAmount: 0,
-        negativeBetAmount: 0,
-        resolved: false,
-      };
+  it("playerOne should be able to bet", async (() => {
+    const playerOneBet = {
+      questionId: 1,
+      bettingAddress: playerOne,
+      bet: true,
+      amount: web3.toWei(1, 'ether'),
+    };
 
-      instance.addQuestion(
-          questionOne.question,
-          { from: admin }
-        )
-        .then(tx => {
-          return instance.getQuestion(1);
-        })
-        .then(_question => {
-          assert.equal(_question[0], questionOne.question, 'question text should be same');
-          assert.equal(_question[1], questionOne.resolved, 'question resolution status should be same');
-          assert.equal(_question[2], questionOne.outcome, 'question outcome should be same');
-          assert.equal(_question[3], questionOne.numPositiveBets, 'question numPositiveBets should be same');
-          assert.equal(_question[4], questionOne.numNegativeBets, 'question numNegativeBets should be same');
-          assert.equal(_question[5], questionOne.positiveBetAmount, 'question positiveBetAmount should be same');
-          assert.equal(_question[6], questionOne.negativeBetAmount, 'question negativeBetAmount should be same');
-          return getEventsPromise(instance.QuestionAdded(
-              1
-          ));
-        })
-        .then((event) => {
-          const eventArgs = event[0].args;
-          assert.equal(eventArgs._question.valueOf(), questionOne.question, "should be the newly added question");
-          done();
-        })
-        .catch(done);
-    });
+    const updatedQuestionSubObject = {
+      numPositiveBets: 1,
+      positiveBetAmount: playerOneBet.amount,
+    };
 
-    it("playerOne should be able to bet", done => {
-      const playerOneBet = {
-        questionId: 1,
-        bettingAddress: playerOne,
-        bet: true,
-        amount: web3.toWei(1, 'ether'),
-      };
+    await (instance.bet(
+        playerOneBet.questionId,
+        playerOneBet.bet,
+        { from: playerOne, value: playerOneBet.amount }
+    ));
+    const _playerOneBet = await (instance.getBet(playerOneBet.bettingAddress, playerOneBet.questionId));
+    assert.equal(_playerOneBet[0], playerOneBet.bettingAddress);
+    assert.equal(_playerOneBet[1], playerOneBet.bet);
+    assert.equal(_playerOneBet[2], playerOneBet.amount);
+    let event = await (getEventsPromise(instance.NewBet(
+      _playerOneBet[0],
+      _playerOneBet[1],
+      _playerOneBet[2],
+      playerOneBet.questionId
+    )));
+    let eventArgs = event[0].args;
+    assert.equal(eventArgs._better.valueOf(), playerOne, "should be playerOne address");
+    assert.equal(eventArgs._questionId.valueOf(), playerOneBet.questionId, "should be playerOne bet's question id");
+    assert.equal(eventArgs._bet.valueOf(), playerOneBet.bet, "should be playerOne's bet");
+    assert.equal(eventArgs._amount.valueOf(), playerOneBet.amount, "should be playerOne's bet amount");
 
-      const updatedQuestionSubObject = {
-        numPositiveBets: 1,
-        positiveBetAmount: playerOneBet.amount,
-      };
+    const _question = await (instance.getQuestion(playerOneBet.questionId));
+    assert.equal(_question[3], updatedQuestionSubObject.numPositiveBets, 'question numPositiveBets should be updated');
+    assert.equal(_question[5], updatedQuestionSubObject.positiveBetAmount, 'question positiveBetAmount should be updated');
 
-      instance.bet(
-          playerOneBet.questionId,
-          playerOneBet.bet,
-          { from: playerOne, value: playerOneBet.amount }
-        )
-        .then(tx => {
-          return instance.getBet(playerOneBet.bettingAddress, playerOneBet.questionId);
-        })
-        .then(_playerOneBet => {
-          assert.equal(_playerOneBet[0], playerOneBet.bettingAddress);
-          assert.equal(_playerOneBet[1], playerOneBet.bet);
-          assert.equal(_playerOneBet[2], playerOneBet.amount);
-          return getEventsPromise(instance.NewBet(
-            _playerOneBet[0],
-            _playerOneBet[1],
-            _playerOneBet[2],
-            playerOneBet.questionId
-          ));
-        })
-        .then((event) => {
-          const eventArgs = event[0].args;
-          assert.equal(eventArgs._better.valueOf(), playerOne, "should be playerOne address");
-          assert.equal(eventArgs._questionId.valueOf(), playerOneBet.questionId, "should be playerOne bet's question id");
-          assert.equal(eventArgs._bet.valueOf(), playerOneBet.bet, "should be playerOne's bet");
-          assert.equal(eventArgs._amount.valueOf(), playerOneBet.amount, "should be playerOne's bet amount");
-          return;
-        })
-        .then(() => {
-          return instance.getQuestion(playerOneBet.questionId);
-        })
-        .then(_question => {
-          assert.equal(_question[3], updatedQuestionSubObject.numPositiveBets, 'question numPositiveBets should be updated');
-          assert.equal(_question[5], updatedQuestionSubObject.positiveBetAmount, 'question positiveBetAmount should be updated');
-          return getEventsPromise(instance.UpdatedQuestionData(
-              _question.question,
-              playerOneBet.questionId,
-              _question.numPositiveBets,
-              _question.numNegativeBets
-          ));
-        })
-        .then((event) => {
-          const eventArgs = event[0].args;
-          assert.equal(eventArgs._numPositiveBets.valueOf(), updatedQuestionSubObject.numPositiveBets, "should be 1 positive bet");
-          assert.equal(eventArgs._positiveBetAmount.valueOf(), updatedQuestionSubObject.positiveBetAmount, "should be 1 positive bet amount");
-          done();
-        })
-        .catch(done);
-    });
+    event = await (getEventsPromise(instance.UpdatedQuestionData(
+        _question.question,
+        playerOneBet.questionId,
+        _question.numPositiveBets,
+        _question.numNegativeBets
+    )));
+    eventArgs = event[0].args;
+    assert.equal(eventArgs._numPositiveBets.valueOf(), updatedQuestionSubObject.numPositiveBets, "should be 1 positive bet");
+    assert.equal(eventArgs._positiveBetAmount.valueOf(), updatedQuestionSubObject.positiveBetAmount, "should be 1 positive bet amount");
+  }));
 
-    it("playerTwo should be able to bet", done => {
-      const playerTwoBet = {
-        questionId: 1,
-        bettingAddress: playerTwo,
-        bet: false,
-        amount: web3.toWei(0.5, 'ether'),
-      };
+  it("playerTwo should be able to bet", async (() => {
+    const playerTwoBet = {
+      questionId: 1,
+      bettingAddress: playerTwo,
+      bet: true,
+      amount: web3.toWei(0.5, 'ether'),
+    };
 
-      const updatedQuestionSubObject = {
-        numNegativeBets: 1,
-        negativeBetAmount: playerTwoBet.amount,
-      };
+    const updatedQuestionSubObject = {
+      numPositiveBets: 1,
+      positiveBetAmount: playerTwoBet.amount,
+    };
 
-      instance.bet(
-          playerTwoBet.questionId,
-          playerTwoBet.bet,
-          { from: playerTwo, value: playerTwoBet.amount }
-        )
-        .then(tx => {
-          return instance.getBet(playerTwoBet.bettingAddress, playerTwoBet.questionId);
-        })
-        .then(_playerTwoBet => {
-          assert.equal(_playerTwoBet[0], playerTwoBet.bettingAddress);
-          assert.equal(_playerTwoBet[1], playerTwoBet.bet);
-          assert.equal(_playerTwoBet[2], playerTwoBet.amount);
-          return getEventsPromise(instance.NewBet(
-              _playerTwoBet[0],
-              _playerTwoBet[1],
-              _playerTwoBet[2],
-              playerTwoBet.questionId
-          ));
-        })
-        .then((event) => {
-          const eventArgs = event[0].args;
-          assert.equal(eventArgs._better.valueOf(), playerTwo, "should be playerTwo address");
-          assert.equal(eventArgs._questionId.valueOf(), playerTwoBet.questionId, "should be playerTwo bet's question id");
-          assert.equal(eventArgs._bet.valueOf(), playerTwoBet.bet, "should be playerTwo's bet");
-          assert.equal(eventArgs._amount.valueOf(), playerTwoBet.amount, "should be playerTwo's bet amount");
-          return;
-        })
-        .then(() => {
-          return instance.getQuestion(playerTwoBet.questionId);
-        })
-        .then(_question => {
-          assert.equal(_question[4], updatedQuestionSubObject.numNegativeBets, 'question numNegativeBets should be updated');
-          assert.equal(_question[6], updatedQuestionSubObject.negativeBetAmount, 'question negativeBetAmount should be updated');
-          return getEventsPromise(instance.UpdatedQuestionData(
-              _question.question,
-              playerTwoBet.questionId,
-              _question.numPositiveBets,
-              _question.numNegativeBets
-          ));
-        })
-        .then((event) => {
-          const eventArgs = event[0].args;
-          assert.equal(eventArgs._numNegativeBets.valueOf(), updatedQuestionSubObject.numNegativeBets, "should be 1 negative bet");
-          assert.equal(eventArgs._negativeBetAmount.valueOf(), updatedQuestionSubObject.negativeBetAmount, "should be 0.5 negative bet amount");
-          done();
-        })
-        .catch(done);
-    });
+    await (instance.bet(
+        playerTwoBet.questionId,
+        playerTwoBet.bet,
+        { from: playerTwo, value: playerTwoBet.amount }
+    ));
+    const _playerTwoBet = await (instance.getBet(playerTwoBet.bettingAddress, playerTwoBet.questionId));
+    assert.equal(_playerTwoBet[0], playerTwoBet.bettingAddress);
+    assert.equal(_playerTwoBet[1], playerTwoBet.bet);
+    assert.equal(_playerTwoBet[2], playerTwoBet.amount);
+    let event = await (getEventsPromise(instance.NewBet(
+      _playerTwoBet[0],
+      _playerTwoBet[1],
+      _playerTwoBet[2],
+      playerTwoBet.questionId
+    )));
+    let eventArgs = event[0].args;
+    assert.equal(eventArgs._better.valueOf(), playerTwo, "should be playerTwo address");
+    assert.equal(eventArgs._questionId.valueOf(), playerTwoBet.questionId, "should be playerTwo bet's question id");
+    assert.equal(eventArgs._bet.valueOf(), playerTwoBet.bet, "should be playerTwo's bet");
+    assert.equal(eventArgs._amount.valueOf(), playerTwoBet.amount, "should be playerTwo's bet amount");
 
-    it('should revert if a player tries to claim funds on an unresolved question', () => {
-      return expectedExceptionPromise(() => {
-        return instance.claimFunds(
-          1,
-          { from: playerOne, gas: 1000000 }
-        )
-        .then(txObj => txObj.tx);
-      }, 1000000);
-    });
+    const _question = await (instance.getQuestion(playerTwoBet.questionId));
+    assert.equal(_question[3], updatedQuestionSubObject.numPositiveBets, 'question numPositiveBets should be updated');
+    assert.equal(_question[5], updatedQuestionSubObject.positiveBetAmount, 'question positiveBetAmount should be updated');
 
-    it('should revert if non trusted party tries to resolve a question', () => {
-      return expectedExceptionPromise(() => {
-        return instance.resolveQuestion(
-          1,
-          false,
-          { from: playerOne, gas: 1000000 }
-        )
-        .then(txObj => txObj.tx);
-      }, 1000000);
-    });
+    event = await (getEventsPromise(instance.UpdatedQuestionData(
+        _question.question,
+        playerTwoBet.questionId,
+        _question.numPositiveBets,
+        _question.numNegativeBets
+    )));
+    eventArgs = event[0].args;
+    assert.equal(eventArgs._numPositiveBets.valueOf(), updatedQuestionSubObject.numPositiveBets, "should be 1 positive bet");
+    assert.equal(eventArgs._positiveBetAmount.valueOf(), updatedQuestionSubObject.positiveBetAmount, "should be 1 positive bet amount");
+  }));
 
-    it('should revert if trusted party tries to resolve an already resolved question', done => {
-      let instance;
+  it('should revert if a player tries to claim funds on an unresolved question', async (() => {
+    await (expectThrow(instance.claimFunds(
+      1,
+      { from: playerOne, gas: 1000000 }
+    )));
+  }));
 
-      const questionOne = {
-        question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
-        id: 1,
-        outcome: false,
-        numPositiveBets: 0,
-        numNegativeBets: 0,
-        positiveBetAmount: 0,
-        negativeBetAmount: 0,
-        resolved: false,
-      };
+  it('should revert if non trusted party tries to resolve a question', async (() => {
+    await (expectThrow(instance.resolveQuestion(
+      1,
+      false,
+      { from: playerOne, gas: 1000000 }
+    )));
+  }));
 
-      PredictionMarket.new(
+  it('should revert if trusted party tries to resolve an already resolved question', async (() => {
+    const questionOne = {
+      question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
+      id: 1,
+      outcome: false,
+      numPositiveBets: 0,
+      numNegativeBets: 0,
+      positiveBetAmount: 0,
+      negativeBetAmount: 0,
+      resolved: false,
+    };
+
+    const instance = await (PredictionMarket.new(
+      { from: admin }
+    ));
+
+    await (instance.addQuestion(
+        questionOne.question,
         { from: admin }
-      )
-      .then(thisInstance => {
-        instance = thisInstance;
-        return;
-      })
-      .then(() => {
-        return instance.addQuestion(
-            questionOne.question,
-            { from: admin }
-        );
-      })
-      .then(() => {
-        return instance.addTrustedSource(
-          trustedSource,
-          { from: admin, gas: 1000000 }
-        );
-      })
-      .then(() => {
-        return instance.trustedSources(trustedSource);
-      })
-      .then(_isTrusted => {
-        assert.equal(_isTrusted, true, "should be a trusted source");
-        return
-      })
-      .then(() => {
-        return instance.resolveQuestion(
-          questionOne.id,
-          true,
-          { from: trustedSource, gas: 1000000 }
-        )
-      })
-      .then(() => {
-        return expectedExceptionPromise(() => {
-          return instance.resolveQuestion(
-            questionOne.id,
-            false,
-            { from: trustedSource, gas: 1000000 }
-          )
-          .then(txObj => txObj.tx)
-        }, 1000000);
-      })
-      .then(done)
-      .catch(done);
-    });
+    ));
 
-    it('trusted source should be able to resolve an unresolved question', done => {
-      let instance;
+    await (instance.addTrustedSource(
+      trustedSource,
+      { from: admin, gas: 1000000 }
+    ));
 
-      const questionOne = {
-        question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
-        id: 1,
-        outcome: false,
-        numPositiveBets: 0,
-        numNegativeBets: 0,
-        positiveBetAmount: 0,
-        negativeBetAmount: 0,
-        resolved: false,
-      };
+    const _isTrusted = await (instance.trustedSources(trustedSource));
+    assert.equal(_isTrusted, true, "should be a trusted source");
 
-      PredictionMarket.new(
+    await (instance.resolveQuestion(
+      questionOne.id,
+      true,
+      { from: trustedSource, gas: 1000000 }
+    ));
+
+    await (expectThrow(instance.resolveQuestion(
+      questionOne.id,
+      false,
+      { from: trustedSource, gas: 1000000 }
+    )));
+  }));
+
+  it('trusted source should be able to resolve an unresolved question', async (() => {
+    const questionOne = {
+      question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
+      id: 1,
+      outcome: false,
+      numPositiveBets: 0,
+      numNegativeBets: 0,
+      positiveBetAmount: 0,
+      negativeBetAmount: 0,
+      resolved: false,
+    };
+
+    const instance = await (PredictionMarket.new(
+      { from: admin }
+    ));
+
+    await (instance.addQuestion(
+        questionOne.question,
         { from: admin }
-      )
-      .then(thisInstance => {
-        instance = thisInstance;
-        return;
-      })
-      .then(() => {
-        return instance.addQuestion(
-            questionOne.question,
-            { from: admin }
-        );
-      })
-      .then(() => {
-        return instance.addTrustedSource(
-          trustedSource,
-          { from: admin, gas: 1000000 }
-        );
-      })
-      .then(() => {
-        return instance.trustedSources(trustedSource);
-      })
-      .then(_isTrusted => {
-        assert.equal(_isTrusted, true, "should be a trusted source");
-        return
-      })
-      .then(() => {
-        return instance.resolveQuestion(
-          questionOne.id,
-          false,
-          { from: trustedSource, gas: 1000000 }
-        );
-      })
-      .then(() => {
-        return instance.getQuestion(questionOne.id);
-      })
-      .then(_question => {
-        assert.equal(_question[1], true, 'should be resolved');
-        done();
-      })
-      .catch(done);
-    });
+    ));
 
-    it('should revert if trusted party tries to resolve an already resolved question', done => {
-      let instance;
+    await (instance.addTrustedSource(
+      trustedSource,
+      { from: admin, gas: 1000000 }
+    ));
 
-      const questionOne = {
-        question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
-        id: 1,
-        outcome: false,
-        numPositiveBets: 0,
-        numNegativeBets: 0,
-        positiveBetAmount: 0,
-        negativeBetAmount: 0,
-        resolved: false,
-      };
+    const _isTrusted = await (instance.trustedSources(trustedSource));
+    assert.equal(_isTrusted, true, "should be a trusted source");
 
-      PredictionMarket.new(
+    await (instance.resolveQuestion(
+      questionOne.id,
+      false,
+      { from: trustedSource, gas: 1000000 }
+    ));
+
+    const _question = await (instance.getQuestion(questionOne.id));
+    assert.equal(_question[1], true, 'should be resolved');
+  }));
+
+  it('should revert if trusted party tries to resolve an already resolved question', async (() => {
+    const questionOne = {
+      question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
+      id: 1,
+      outcome: false,
+      numPositiveBets: 0,
+      numNegativeBets: 0,
+      positiveBetAmount: 0,
+      negativeBetAmount: 0,
+      resolved: false,
+    };
+
+    const instance = await (PredictionMarket.new(
+      { from: admin }
+    ));
+
+    await (instance.addQuestion(
+        questionOne.question,
         { from: admin }
-      )
-      .then(thisInstance => {
-        instance = thisInstance;
-        return;
-      })
-      .then(() => {
-        return instance.addQuestion(
-            questionOne.question,
-            { from: admin }
-        );
-      })
-      .then(() => {
-        return instance.addTrustedSource(
-          trustedSource,
-          { from: admin, gas: 1000000 }
-        );
-      })
-      .then(() => {
-        return instance.trustedSources(trustedSource);
-      })
-      .then(_isTrusted => {
-        assert.equal(_isTrusted, true, "should be a trusted source");
-        return
-      })
-      .then(() => {
-        return instance.resolveQuestion(
-          questionOne.id,
-          true,
-          { from: trustedSource, gas: 1000000 }
-        )
-      })
-      .then(() => {
-        return expectedExceptionPromise(() => {
-          return instance.resolveQuestion(
-            questionOne.id,
-            false,
-            { from: trustedSource, gas: 1000000 }
-          )
-          .then(txObj => txObj.tx)
-        }, 1000000);
-      })
-      .then(done)
-      .catch(done);
-    });
+    ));
 
-    it('should revert if party claims funds on an unresolved question', done => {
-      let instance;
+    await (instance.addTrustedSource(
+      trustedSource,
+      { from: admin, gas: 1000000 }
+    ));
 
-      const questionOne = {
-        question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
-        id: 1,
-        outcome: false,
-        numPositiveBets: 0,
-        numNegativeBets: 0,
-        positiveBetAmount: 0,
-        negativeBetAmount: 0,
-        resolved: false,
-      };
+    const _isTrusted = await (instance.trustedSources(trustedSource));
+    assert.equal(_isTrusted, true, "should be a trusted source");
 
-      PredictionMarket.new(
+    await (instance.resolveQuestion(
+      questionOne.id,
+      true,
+      { from: trustedSource, gas: 1000000 }
+    ));
+
+    await (expectThrow(instance.resolveQuestion(
+      questionOne.id,
+      false,
+      { from: trustedSource, gas: 1000000 }
+    )));
+  }));
+
+  it('should revert if party claims funds on an unresolved question', async (() => {
+    const questionOne = {
+      question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
+      id: 1,
+      outcome: false,
+      numPositiveBets: 0,
+      numNegativeBets: 0,
+      positiveBetAmount: 0,
+      negativeBetAmount: 0,
+      resolved: false,
+    };
+
+    const instance = await (PredictionMarket.new(
+      { from: admin }
+    ));
+
+    await (instance.addQuestion(
+        questionOne.question,
         { from: admin }
-      )
-      .then(thisInstance => {
-        instance = thisInstance;
-        return;
-      })
-      .then(() => {
-        return instance.addQuestion(
-            questionOne.question,
-            { from: admin }
-        );
-      })
-      .then(() => {
-        return instance.addTrustedSource(
-          trustedSource,
-          { from: admin, gas: 1000000 }
-        );
-      })
-      .then(() => {
-        return instance.trustedSources(trustedSource);
-      })
-      .then(_isTrusted => {
-        assert.equal(_isTrusted, true, "should be a trusted source");
-        return
-      })
-      .then(() => {
-        return expectedExceptionPromise(() => {
-          return instance.claimFunds(
-            questionOne.id,
-            { from: playerOne, gas: 1000000 }
-          )
-          .then(txObj => txObj.tx)
-        }, 1000000);
-      })
-      .then(done)
-      .catch(done);
-    });
+    ));
 
-    it('should handle claiming of funds on a resolved question', done => {
-      const playerOneBet = {
-        questionId: 1,
-        bettingAddress: playerOne,
-        bet: true,
-        amount: web3.toWei(1, 'ether'),
-      };
-      const playerTwoBet = {
-        questionId: 1,
-        bettingAddress: playerTwo,
-        bet: false,
-        amount: web3.toWei(0.5, 'ether'),
-      };
-      const questionOne = {
-        question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
-        id: 1,
-        outcome: false,
-        numPositiveBets: 0,
-        numNegativeBets: 0,
-        positiveBetAmount: 0,
-        negativeBetAmount: 0,
-        resolved: false,
-      };
+    await (instance.addTrustedSource(
+      trustedSource,
+      { from: admin, gas: 1000000 }
+    ));
 
-      let instance;
-      let initialPlayerTwoBalance;
+    const _isTrusted = await (instance.trustedSources(trustedSource));
+    assert.equal(_isTrusted, true, "should be a trusted source");
 
-      PredictionMarket.new(
+    await (expectThrow(instance.claimFunds(
+      questionOne.id,
+      { from: playerOne, gas: 1000000 }
+    )));
+  }));
+
+  it('should handle claiming of funds on a resolved question', async (() => {
+    const playerOneBet = {
+      questionId: 1,
+      bettingAddress: playerOne,
+      bet: true,
+      amount: web3.toWei(1, 'ether'),
+    };
+    const playerTwoBet = {
+      questionId: 1,
+      bettingAddress: playerTwo,
+      bet: false,
+      amount: web3.toWei(0.5, 'ether'),
+    };
+    const questionOne = {
+      question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
+      id: 1,
+      outcome: false,
+      numPositiveBets: 0,
+      numNegativeBets: 0,
+      positiveBetAmount: 0,
+      negativeBetAmount: 0,
+      resolved: false,
+    };
+
+    const instance = await (PredictionMarket.new(
+      { from: admin }
+    ));
+
+    await (instance.addQuestion(
+        questionOne.question,
         { from: admin }
-      )
-      .then(thisInstance => {
-        instance = thisInstance;
-        return;
-      })
-      .then(() => {
-        return instance.addQuestion(
-            questionOne.question,
-            { from: admin }
-        );
-      })
-      .then(() => {
-        return instance.addTrustedSource(
-          trustedSource,
-          { from: admin, gas: 1000000 }
-        );
-      })
-      .then(() => {
-        return instance.trustedSources(trustedSource);
-      })
-      .then(_isTrusted => {
-        assert.equal(_isTrusted, true, "should be a trusted source");
-        return
-      })
-      .then(() => {
-        return instance.bet(
-            playerOneBet.questionId,
-            playerOneBet.bet,
-            { from: playerOne, value: playerOneBet.amount }
-          );
-      })
-      .then(() => {
-        return instance.bet(
-            playerTwoBet.questionId,
-            playerTwoBet.bet,
-            { from: playerTwo, value: playerTwoBet.amount }
-          );
-      })
-      .then(() => {
-        return instance.resolveQuestion(
-          questionOne.id,
-          false,
-          { from: trustedSource, gas: 1000000 }
-        )
-      })
-      .then(() => {
-        return expectedExceptionPromise(() => {
-          return instance.claimFunds(
-            questionOne.id,
-            { from: playerOne, gas: 1000000 }
-          )
-          .then(txObj => txObj.tx)
-        }, 1000000);
-      })
-      .then(() => {
-        return promisify((cb) => web3.eth.getBalance(playerTwo, cb))
-      })
-      .then(balance => {
-        initialPlayerTwoBalance = balance;
-        return
-      })
-      .then(() => {
-        return instance.claimFunds(
-          questionOne.id,
-          { from: playerTwo, gas: 1000000 }
-        )
-      })
-      .then(txObj => {
-        return promisify((cb) => web3.eth.getBalance(playerTwo, cb));
-      })
-      .then(balance => {
-        assert.isAbove(
-          balance.toNumber(),
-          initialPlayerTwoBalance.toNumber(),
-          "Player two's balance wasn't credited!"
-        );
-        return;
-      })
-      .then(done)
-      .catch(done);
-    });
+    ));
+
+    await (instance.addTrustedSource(
+      trustedSource,
+      { from: admin, gas: 1000000 }
+    ));
+
+    const _isTrusted = await (instance.trustedSources(trustedSource));
+    assert.equal(_isTrusted, true, "should be a trusted source");
+
+    await (instance.bet(
+        playerOneBet.questionId,
+        playerOneBet.bet,
+        { from: playerOne, value: playerOneBet.amount }
+    ));
+    await (instance.bet(
+        playerTwoBet.questionId,
+        playerTwoBet.bet,
+        { from: playerTwo, value: playerTwoBet.amount }
+    ));
+
+    await (instance.resolveQuestion(
+      questionOne.id,
+      false,
+      { from: trustedSource, gas: 1000000 }
+    ));
+
+    await (expectThrow(instance.claimFunds(
+      questionOne.id,
+      { from: playerOne, gas: 1000000 }
+    )));
+
+    const initialPlayerTwoBalance = await (
+      promisify((cb) => web3.eth.getBalance(playerTwo, cb))
+    );
+
+    await (instance.claimFunds(
+      questionOne.id,
+      { from: playerTwo, gas: 1000000 }
+    ));
+
+    const balance = await (
+      promisify((cb) => web3.eth.getBalance(playerTwo, cb))
+    );
+
+    assert.isAbove(
+      balance.toNumber(),
+      initialPlayerTwoBalance.toNumber(),
+      "Player two's balance wasn't credited!"
+    );
+  }));
 });
