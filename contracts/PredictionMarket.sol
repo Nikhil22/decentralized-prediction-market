@@ -1,8 +1,9 @@
 pragma solidity ^0.4.10;
 
-contract PredictionMarket {
+import "./Stoppable.sol";
 
-    address public admin;
+contract PredictionMarket is Stoppable {
+
     mapping (address => bool) public trustedSources;
     mapping (uint64 => Question) public questions;
     uint64 public numQuestions;
@@ -15,6 +16,7 @@ contract PredictionMarket {
         uint256 numNegativeBets;
         uint256 positiveBetAmount;
         uint256 negativeBetAmount;
+        uint256 deadline;
         mapping(address => Bet) bets;
     }
 
@@ -27,26 +29,23 @@ contract PredictionMarket {
     event AddedTrustedSource(address source);
     event NewBet(address _better, bool _bet, uint _amount, uint64 _questionId);
     event QuestionResolved(address source, uint64 _questionId, bool _outcome);
-    event QuestionAdded(string _question);
+    event QuestionAdded(string _question, uint256 _deadline);
     event UpdatedQuestionData(
       string _question,
       uint64 _questionId,
       uint256 _numPositiveBets,
       uint256 _numNegativeBets,
       uint256 _positiveBetAmount,
-      uint256 _negativeBetAmount
+      uint256 _negativeBetAmount,
+      uint256 _deadline
     );
     event Claimed(address claimant, uint256 amount);
 
-    function PredictionMarket()
-        public
-    {
-        admin = msg.sender;
-    }
+    function PredictionMarket() public {}
 
     function addTrustedSource(address source)
         public
-        isAdmin
+        isOwner
         returns (bool success)
     {
         trustedSources[source] = true;
@@ -59,6 +58,7 @@ contract PredictionMarket {
         public
         positiveBet
         isUnresolvedQuestion(_questionId)
+        isWithinQuestionDeadline(_questionId)
         returns (bool success)
     {
         NewBet(msg.sender, _bet, msg.value, _questionId);
@@ -90,7 +90,8 @@ contract PredictionMarket {
         question.numPositiveBets,
         question.numNegativeBets,
         question.positiveBetAmount,
-        question.negativeBetAmount
+        question.negativeBetAmount,
+        question.deadline
       );
       return true;
     }
@@ -99,6 +100,7 @@ contract PredictionMarket {
         public
         isTrustedSource
         isUnresolvedQuestion(_questionId)
+        isWithinQuestionDeadline(_questionId)
         returns (bool success)
     {
         Question storage question = questions[_questionId];
@@ -109,9 +111,9 @@ contract PredictionMarket {
         return true;
     }
 
-    function addQuestion(string _question)
+    function addQuestion(string _question, uint256 duration)
         public
-        isAdmin
+        isOwner
         returns (bool success)
     {
         numQuestions++;
@@ -122,16 +124,18 @@ contract PredictionMarket {
           0,
           0,
           0,
-          0
+          0,
+          block.number + duration
         );
         questions[numQuestions] = question;
-        QuestionAdded(_question);
+        QuestionAdded(_question, block.number + duration);
         return true;
     }
 
     function claimFunds(uint64 _questionId)
         public
         isQuestionResolved(_questionId)
+        isWithinQuestionDeadline(_questionId)
         returns (bool success)
     {
         /* get question */
@@ -170,11 +174,6 @@ contract PredictionMarket {
         return true;
     }
 
-    modifier isAdmin() {
-        require(msg.sender == admin);
-        _;
-    }
-
     modifier isTrustedSource() {
         require(trustedSources[msg.sender]);
         _;
@@ -193,6 +192,13 @@ contract PredictionMarket {
     modifier isQuestionResolved(uint64 _questionId) {
         require(questions[_questionId].resolved);
         _;
+    }
+
+    modifier isWithinQuestionDeadline(uint64 _questionId) {
+      /* get question */
+      Question storage question = questions[_questionId];
+      require(block.number < question.deadline);
+      _;
     }
 
     function getBet(address bettingAddress, uint64 _questionId)
