@@ -8,7 +8,7 @@ const async = require('asyncawait/async');
 const await = require('asyncawait/await');
 
 contract('PredictionMarket', accounts => {
-  const admin = accounts[0];
+  const owner = accounts[0];
   const playerOne = accounts[1];
   const playerTwo = accounts[2];
   const trustedSource = accounts[3];
@@ -16,25 +16,26 @@ contract('PredictionMarket', accounts => {
 
   beforeEach(async (() => {
     instance = await (PredictionMarket.new(
-      { from: admin }
+      { from: owner }
     ));
   }));
 
-  it("admin should be set", async(() => {
-    const _admin = await (instance.admin());
-    assert.equal(admin, _admin, 'admin is not set');
+  it("owner should be set", async(() => {
+    const _owner = await (instance.owner());
+    assert.equal(owner, _owner, 'owner is not set');
   }));
 
-  it('should revert if a non admin tries to add a trusted source', async (() => {
+  it('should revert if a non owner tries to add a trusted source', async (() => {
     await (expectThrow(instance.addTrustedSource(
       trustedSource,
       { from: playerOne, gas: 1000000 }
     )));
   }));
 
-  it('should revert if a non admin tries to add a question', async(() => {
+  it('should revert if a non owner tries to add a question', async(() => {
     await (expectThrow(instance.addQuestion(
       'blah',
+      100,
       { from: playerOne, gas: 1000000 }
     )));
   }));
@@ -47,8 +48,8 @@ contract('PredictionMarket', accounts => {
     )));
   }));
 
-  it("admin should be able to add a trusted source", async (() => {
-    await (instance.addTrustedSource(trustedSource,{ from: admin }));
+  it("owner should be able to add a trusted source", async (() => {
+    await (instance.addTrustedSource(trustedSource,{ from: owner }));
     const _didAddSource = await (instance.trustedSources(trustedSource));
     assert.equal(_didAddSource, true, 'should have added a trusted source');
     const event = await (getEventsPromise(instance.AddedTrustedSource(
@@ -58,7 +59,7 @@ contract('PredictionMarket', accounts => {
     assert.equal(eventArgs.source.valueOf(), trustedSource, "should be the newly added trusted source");
   }));
 
-  it("admin should be able to add a question", async (() => {
+  it("owner should be able to add a question", async (() => {
     const questionOne = {
       question: 'Will Conor Mcgregor defeat Floyd Mayweather?',
       outcome: false,
@@ -71,7 +72,8 @@ contract('PredictionMarket', accounts => {
 
     await (instance.addQuestion(
         questionOne.question,
-        { from: admin }
+        100,
+        { from: owner }
       ));
     const _question = await (instance.getQuestion(1));
     assert.equal(_question[0], questionOne.question, 'question text should be same');
@@ -214,17 +216,18 @@ contract('PredictionMarket', accounts => {
     };
 
     const instance = await (PredictionMarket.new(
-      { from: admin }
+      { from: owner }
     ));
 
     await (instance.addQuestion(
         questionOne.question,
-        { from: admin }
+        100,
+        { from: owner }
     ));
 
     await (instance.addTrustedSource(
       trustedSource,
-      { from: admin, gas: 1000000 }
+      { from: owner, gas: 1000000 }
     ));
 
     const _isTrusted = await (instance.trustedSources(trustedSource));
@@ -256,17 +259,18 @@ contract('PredictionMarket', accounts => {
     };
 
     const instance = await (PredictionMarket.new(
-      { from: admin }
+      { from: owner }
     ));
 
     await (instance.addQuestion(
         questionOne.question,
-        { from: admin }
+        100,
+        { from: owner }
     ));
 
     await (instance.addTrustedSource(
       trustedSource,
-      { from: admin, gas: 1000000 }
+      { from: owner, gas: 1000000 }
     ));
 
     const _isTrusted = await (instance.trustedSources(trustedSource));
@@ -295,17 +299,18 @@ contract('PredictionMarket', accounts => {
     };
 
     const instance = await (PredictionMarket.new(
-      { from: admin }
+      { from: owner }
     ));
 
     await (instance.addQuestion(
         questionOne.question,
-        { from: admin }
+        100,
+        { from: owner }
     ));
 
     await (instance.addTrustedSource(
       trustedSource,
-      { from: admin, gas: 1000000 }
+      { from: owner, gas: 1000000 }
     ));
 
     const _isTrusted = await (instance.trustedSources(trustedSource));
@@ -337,17 +342,18 @@ contract('PredictionMarket', accounts => {
     };
 
     const instance = await (PredictionMarket.new(
-      { from: admin }
+      { from: owner }
     ));
 
     await (instance.addQuestion(
         questionOne.question,
-        { from: admin }
+        100,
+        { from: owner }
     ));
 
     await (instance.addTrustedSource(
       trustedSource,
-      { from: admin, gas: 1000000 }
+      { from: owner, gas: 1000000 }
     ));
 
     const _isTrusted = await (instance.trustedSources(trustedSource));
@@ -384,17 +390,18 @@ contract('PredictionMarket', accounts => {
     };
 
     const instance = await (PredictionMarket.new(
-      { from: admin }
+      { from: owner }
     ));
 
     await (instance.addQuestion(
         questionOne.question,
-        { from: admin }
+        100,
+        { from: owner }
     ));
 
     await (instance.addTrustedSource(
       trustedSource,
-      { from: admin, gas: 1000000 }
+      { from: owner, gas: 1000000 }
     ));
 
     const _isTrusted = await (instance.trustedSources(trustedSource));
