@@ -6,15 +6,15 @@ import "./PredictionMarket.sol";
 contract PredictionMarketHub is Stoppable {
 
     address[] public predictionMarkets;
-    mapping (address => bool) predictionMarketExists;
+    mapping (address => bool) public predictionMarketExists;
 
     modifier onlyIfPredictionMarket (address predictionMarket)
     {
-        if (predictionMarketExists[predictionMarket] != true) revert();
+        require(predictionMarketExists[predictionMarket] == true);
         _;
     }
 
-    event LogNewPredictionMarket(address sponsor, address predictionMarket, uint duration, uint goal);
+    event LogNewPredictionMarket(address sponsor, address predictionMarket);
     event LogPredictionMarketStoppaed(address sender, address predictionMarket);
     event LogPredictionMarketStarted(address sender, address predictionMarket);
     event LogPredictionMarketNewOwner(address sender, address predictionMarket, address newOwner);
@@ -27,7 +27,7 @@ contract PredictionMarketHub is Stoppable {
         return predictionMarkets.length;
     }
 
-    function createPredictionMarket (uint predictionMarketDuration, uint predictionMarketGoal)
+    function createPredictionMarket ()
         public
         returns (address predictionMarketContract)
     {
@@ -35,7 +35,7 @@ contract PredictionMarketHub is Stoppable {
         predictionMarkets.push(trustedPredictionMarket);
         predictionMarketExists[trustedPredictionMarket] = true;
 
-        LogNewPredictionMarket(msg.sender, trustedPredictionMarket, predictionMarketDuration, predictionMarketGoal);
+        LogNewPredictionMarket(msg.sender, trustedPredictionMarket);
         return trustedPredictionMarket;
     }
 
