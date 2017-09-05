@@ -8,6 +8,10 @@ contract PredictionMarket is Stoppable {
     mapping (uint64 => Question) public questions;
     uint64 public numQuestions;
 
+    /* Declare arrays for data that we'd mostly likely need to loop through on the front end */
+    uint64[] public questionsList;
+    address[] public trustSourcesList;
+
     struct Question {
         string question;
         bool resolved;
@@ -49,6 +53,7 @@ contract PredictionMarket is Stoppable {
         returns (bool success)
     {
         trustedSources[source] = true;
+        trustSourcesList.push(source);
         AddedTrustedSource(source);
         return true;
     }
@@ -128,6 +133,7 @@ contract PredictionMarket is Stoppable {
           block.number + duration
         );
         questions[numQuestions] = question;
+        questionsList.push(numQuestions);
         QuestionAdded(_question, block.number + duration);
         return true;
     }
@@ -172,6 +178,10 @@ contract PredictionMarket is Stoppable {
         msg.sender.transfer(amountToTransfer);
         Claimed(msg.sender, amountToTransfer);
         return true;
+    }
+
+    function killMe() public isOwner {
+      selfdestruct(msg.sender);
     }
 
     modifier isTrustedSource() {

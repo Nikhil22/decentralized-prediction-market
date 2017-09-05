@@ -52,6 +52,10 @@ contract('PredictionMarket', accounts => {
     await (instance.addTrustedSource(trustedSource,{ from: owner }));
     const _didAddSource = await (instance.trustedSources(trustedSource));
     assert.equal(_didAddSource, true, 'should have added a trusted source');
+
+    const _sourceAddress = await (instance.trustSourcesList(0));
+    assert.equal(_sourceAddress, trustedSource, 'should have added source address to list');
+
     const event = await (getEventsPromise(instance.AddedTrustedSource(
         trustedSource
     )));
@@ -83,6 +87,10 @@ contract('PredictionMarket', accounts => {
     assert.equal(_question[4], questionOne.numNegativeBets, 'question numNegativeBets should be same');
     assert.equal(_question[5], questionOne.positiveBetAmount, 'question positiveBetAmount should be same');
     assert.equal(_question[6], questionOne.negativeBetAmount, 'question negativeBetAmount should be same');
+
+    const _isQuestion = await (instance.questionsList(0));
+    assert.equal(_isQuestion, true, 'should have added question to list');
+
     const event = await (getEventsPromise(
       instance.QuestionAdded(1)
     ));
