@@ -57,10 +57,6 @@ contract('PredictionMarketHub', accounts => {
         from: accounts[1], gas: 1000000
       })));
     }));
-
-    //add is running to code
-
-    //should throw when stopped
   }));
 
 });
