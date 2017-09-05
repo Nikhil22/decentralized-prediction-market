@@ -64,7 +64,7 @@ contract PredictionMarket is Stoppable {
         public
         positiveBet
         isUnresolvedQuestion(_questionId)
-        //isWithinQuestionDeadline(_questionId)
+        isWithinQuestionDeadline(_questionId)
         onlyIfRunning
         returns (bool success)
     {
