@@ -50,6 +50,7 @@ contract PredictionMarket is Stoppable {
     function addTrustedSource(address source)
         public
         isOwner
+        onlyIfRunning
         returns (bool success)
     {
         trustedSources[source] = true;
@@ -64,6 +65,7 @@ contract PredictionMarket is Stoppable {
         positiveBet
         isUnresolvedQuestion(_questionId)
         isWithinQuestionDeadline(_questionId)
+        onlyIfRunning
         returns (bool success)
     {
         NewBet(msg.sender, _bet, msg.value, _questionId);
@@ -106,6 +108,7 @@ contract PredictionMarket is Stoppable {
         isTrustedSource
         isUnresolvedQuestion(_questionId)
         isWithinQuestionDeadline(_questionId)
+        onlyIfRunning
         returns (bool success)
     {
         Question storage question = questions[_questionId];
@@ -119,6 +122,7 @@ contract PredictionMarket is Stoppable {
     function addQuestion(string _question, uint256 duration)
         public
         isOwner
+        onlyIfRunning
         returns (bool success)
     {
         numQuestions++;
@@ -142,6 +146,7 @@ contract PredictionMarket is Stoppable {
         public
         isQuestionResolved(_questionId)
         isWithinQuestionDeadline(_questionId)
+        onlyIfRunning
         returns (bool success)
     {
         /* get question */

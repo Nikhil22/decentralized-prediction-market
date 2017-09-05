@@ -48,6 +48,25 @@ contract('PredictionMarket', accounts => {
     )));
   }));
 
+  it('should revert if attempting add a trusted source, bet, or a question during stopped phase', async (() => {
+    await (instance.runSwitch(false));
+
+    await (expectThrow(instance.bet(
+      1,
+      web3.toWei(1, 'ether'),
+      { from: owner, gas: 1000000 }
+    )));
+    await (expectThrow(instance.addTrustedSource(
+      trustedSource,
+      { from: owner, gas: 1000000 }
+    )));
+    await (expectThrow(instance.addQuestion(
+      'blah',
+      100,
+      { from: owner, gas: 1000000 }
+    )));
+  }));
+
   it("owner should be able to add a trusted source", async (() => {
     await (instance.addTrustedSource(trustedSource,{ from: owner }));
     const _didAddSource = await (instance.trustedSources(trustedSource));
